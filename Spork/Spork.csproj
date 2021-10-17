@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<RequiresPreviewFeatures>True</RequiresPreviewFeatures>
+		<LangVersion>preview</LangVersion>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Silk.NET.Input.Desktop" Version="2.0.0-preview" />
+		<PackageReference Include="Silk.NET.Vulkan" Version="2.8.0" />
+		<PackageReference Include="Silk.NET.Vulkan.Extensions.EXT" Version="2.8.0" />
+		<PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.8.0" />
+		<PackageReference Include="Silk.NET.Windowing" Version="2.8.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="1.0.4" />
+	</ItemGroup>
+
+</Project>
