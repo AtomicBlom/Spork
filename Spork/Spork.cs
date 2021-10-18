@@ -8,10 +8,18 @@ using Silk.NET.Windowing;
 
 namespace Spork;
 
-public class Spork
+
+public interface IInternalSpork
+{
+    Vk Vulkan { get; }
+}
+
+public class Spork : IInternalSpork
 {
     private readonly IWindow _window;
     private readonly Vk _vk;
+
+    Vk IInternalSpork.Vulkan => _vk;
 
     public Spork(IWindow window)
     {
@@ -20,6 +28,8 @@ public class Spork
     }
 
     public bool EnableValidationLayers { get; init; }
+    public string EngineName { get; init; } = "Spork Vulkan Abstraction Layer";
+    public string ApplicationName { get; init; } = "Unnamed Application";
     public IReadOnlyList<string[]> ValidationLayerNamesPriorityList { get; init; } = new List<string[]>()
     {
         new[] { "VK_LAYER_KHRONOS_validation" },
@@ -67,9 +77,9 @@ public class Spork
 
         var appInfo = new ApplicationInfo(StructureType.ApplicationInfo)
         {
-            PApplicationName = (byte*)Marshal.StringToHGlobalAnsi("Hello Vulkan"),
+            PApplicationName = (byte*)Marshal.StringToHGlobalAnsi(ApplicationName),
             ApplicationVersion = new Version32(1, 0, 0),
-            PEngineName = (byte*)Marshal.StringToHGlobalAnsi("Paper Engine"),
+            PEngineName = (byte*)Marshal.StringToHGlobalAnsi(EngineName),
             EngineVersion = new Version32(1, 0, 0),
             ApiVersion = Vk.Version11
         };
@@ -116,7 +126,7 @@ public class Spork
             SilkMarshal.Free((nint)createInfo.PpEnabledLayerNames);
         }
 
-        return new SporkInstance(_vk, instance)
+        return new SporkInstance(this, instance)
         {
             MandatoryDeviceExtensions = MandatoryDeviceExtensions,
             DesiredDeviceExtensions = DesiredDeviceExtensions

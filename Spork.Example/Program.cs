@@ -97,7 +97,13 @@ internal class Game
         }
 
         var surfaceKhronos = _instance.CreateSurface(_window);
-        var physicalDevices = _instance.GetPhysicalDevices();
+        var physicalDevices = _instance.GetPhysicalDevices()
+                .PopulateQueueFamilies()
+            
+            .Where(d => d.CanPresent && d.CanRender)
+            .PopulateSwapChainSupport(surfaceKhronos)
+            .Where(d => )
+            ;
 
     }
 }

@@ -6,22 +6,32 @@ using Silk.NET.Windowing;
 
 namespace Spork;
 
-public class SporkInstance : IDisposable
+public interface IInternalSporkInstance
+{
+    Vk Vulkan { get; }
+    Instance NativeInstance { get; }
+}
+
+public class SporkInstance : IDisposable, IInternalSporkInstance
 {
     private readonly Vk _vk;
-    public Instance NativeInstance { get; }
+    private readonly Instance _nativeInstance;
+
+    Vk IInternalSporkInstance.Vulkan => _vk;
+    Instance IInternalSporkInstance.NativeInstance => _nativeInstance;
+
     public IReadOnlyList<string> MandatoryDeviceExtensions { get; init; }
     public IReadOnlyList<string> DesiredDeviceExtensions { get; init; }
 
-    public SporkInstance(Vk vk, Instance instance)
+    public SporkInstance(IInternalSpork spork, Instance instance)
     {
-        _vk = vk;
-        NativeInstance = instance;
+        _vk = spork.Vulkan;
+        _nativeInstance = instance;
     }
 
     public bool TryGetExtension<TExtension, TNativeExtension>(out TExtension extension) where TExtension : ISporkInstanceExtension<TNativeExtension>, new() where TNativeExtension : NativeExtension<Vk>
     {
-        if (!_vk.TryGetInstanceExtension(NativeInstance, out TNativeExtension nativeExtension))
+        if (!_vk.TryGetInstanceExtension(_nativeInstance, out TNativeExtension nativeExtension))
         {
             extension = default!;
             return false;
@@ -37,12 +47,12 @@ public class SporkInstance : IDisposable
 
     public unsafe SurfaceKHR CreateSurface(IWindow window)
     {
-        return window.VkSurface!.Create<AllocationCallbacks>(NativeInstance.ToHandle(), null).ToSurface();
+        return window.VkSurface!.Create<AllocationCallbacks>(_nativeInstance.ToHandle(), null).ToSurface();
     }
 
-    public IReadOnlyList<SporkPhysicalDevice> GetPhysicalDevices(KhrSurface khronosSurfaceExtension, SurfaceKHR khronosSurface)
+    public IReadOnlyList<SporkPhysicalDevice> GetPhysicalDevices()
     {
-        var devices = _vk.GetPhysicalDevices(NativeInstance)
+        var devices = _vk.GetPhysicalDevices(_nativeInstance)
             .Select(device => ResolvePhysicalDevice(device, khronosSurfaceExtension, khronosSurface))
             .Where(device => MandatoryDeviceExtensions.All(device.HasExtension) &&
                              device.IsComplete && device.IsSwapChainAdequate
@@ -135,7 +145,7 @@ public class SporkInstance : IDisposable
 
     private unsafe void ReleaseUnmanagedResources()
     {
-        _vk.DestroyInstance(NativeInstance, null);
+        _vk.DestroyInstance(_nativeInstance, null);
     }
 
     public void Dispose()
@@ -148,4 +158,25 @@ public class SporkInstance : IDisposable
     {
         ReleaseUnmanagedResources();
     }
+}
+
+public static class SporkPhysicalDeviceExtensions
+{
+    public static IEnumerable<SporkPhysicalDevice> PopulateQueueFamilies(this IEnumerable<SporkPhysicalDevice> deviceList)
+    {
+        foreach (var sporkPhysicalDevice in deviceList)
+        {
+            yield return sporkPhysicalDevice;
+        }
+    }
+
+    public static IEnumerable<SporkPhysicalDevice> PopulateSwapChainSupport(
+        this IEnumerable<SporkPhysicalDevice> deviceList, KhrSurface khronosSurfaceExtension, SurfaceKHR khronosSurface)
+    {
+        foreach (var sporkPhysicalDevice in deviceList)
+        {
+            yield return sporkPhysicalDevice;
+        }
+    }
+
 }
