@@ -108,8 +108,9 @@ internal class Game
             KhrSwapchain.ExtensionName
         };
 
-        var surfaceKhronos = _instance.CreateSurface(_window);
-        var validPhysicalDevices = GetValidPhysicalDevices(khronosSurfaceExtension, surfaceKhronos, requiredExtensions);
+        var surface = _applicationScopeDisposables.Add(khronosSurfaceExtension.CreateSurface(_window));
+        
+        var validPhysicalDevices = GetValidPhysicalDevices(surface, requiredExtensions);
 
         var physicalDevice = validPhysicalDevices.FirstOrDefault() ?? throw new Exception("Unable to find a valid device that can be used to render graphics and present");
         Queue graphicsQueue = default;
@@ -123,16 +124,16 @@ internal class Game
         _applicationScopeDisposables.Add(device);
     }
 
-    private IEnumerable<SelectedPhysicalDevice> GetValidPhysicalDevices(SporkKhronosSurfaceExtension khronosSurfaceExtension, SurfaceKHR surfaceKhronos, string[] requiredExtensions)
+    private IEnumerable<SelectedPhysicalDevice> GetValidPhysicalDevices(SporkSurface surface, string[] requiredExtensions)
     {
         return from physicalDevice in _instance.GetPhysicalDevices(requiredExtensions)
             let queueFamilies = physicalDevice.GetPhysicalDeviceQueueFamilyProperties()
             let graphicsQueueFamily = queueFamilies.FirstOrDefault(p => p.Properties.QueueFlags.HasFlag(QueueFlags.QueueGraphicsBit))
-            let presentQueueFamily = queueFamilies.FirstOrDefault(queueFamilyProperties => khronosSurfaceExtension.DoesQueueSupportPresentation(physicalDevice, queueFamilyProperties.Index, surfaceKhronos))
+            let presentQueueFamily = queueFamilies.FirstOrDefault(queueFamilyProperties => surface.DoesQueueSupportPresentation(physicalDevice, queueFamilyProperties.Index))
             where presentQueueFamily != null && graphicsQueueFamily != null
-            let surfaceCapabilities = khronosSurfaceExtension.GetPhysicalDeviceSurfaceCapabilities(physicalDevice, surfaceKhronos)
-            let surfaceFormats = khronosSurfaceExtension.GetPhysicalDeviceSurfaceFormats(physicalDevice, surfaceKhronos)
-            let surfacePresentModes = khronosSurfaceExtension.GetPhysicalDeviceSurfacePresentModes(physicalDevice, surfaceKhronos)
+            let surfaceCapabilities = surface.GetPhysicalDeviceSurfaceCapabilities(physicalDevice)
+            let surfaceFormats = surface.GetPhysicalDeviceSurfaceFormats(physicalDevice)
+            let surfacePresentModes = surface.GetPhysicalDeviceSurfacePresentModes(physicalDevice)
             where surfaceFormats.Any() && surfacePresentModes.Any()
             select new SelectedPhysicalDevice(physicalDevice, graphicsQueueFamily, presentQueueFamily);
     }

@@ -36,11 +36,6 @@ public class SporkInstance : IDisposable, IInternalSporkInstance
         return true;
     }
 
-    public unsafe SurfaceKHR CreateSurface(IWindow window)
-    {
-        return window.VkSurface!.Create<AllocationCallbacks>(_nativeInstance.ToHandle(), null).ToSurface();
-    }
-
     public IReadOnlyList<SporkPhysicalDevice> GetPhysicalDevices(IList<string> requiredExtensions)
     {
         return _vk.GetPhysicalDevices(_nativeInstance)
