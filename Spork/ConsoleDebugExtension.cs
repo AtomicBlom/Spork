@@ -15,7 +15,7 @@ public sealed class ConsoleDebugExtension : ISporkInstanceExtension<ExtDebugUtil
     {
         init => _nativeExtension = value;
     }
-    SporkInstance ISporkInstanceExtension<ExtDebugUtils>.Instance
+    IInternalSporkInstance ISporkInstanceExtension<ExtDebugUtils>.Instance
     {
         init => _instance = value.NativeInstance;
     }

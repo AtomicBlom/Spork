@@ -1,6 +1,8 @@
 ﻿using System.Numerics;
 using Silk.NET.Maths;
+using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.EXT;
+using Silk.NET.Vulkan.Extensions.KHR;
 using Silk.NET.Windowing;
 using Spork;
 
@@ -57,20 +59,20 @@ internal class Game
     {
         runTime += time;
 
-        UniformBufferObject ubo = new UniformBufferObject
-        {
-            Model = Matrix4x4.CreateFromAxisAngle(Vector3.UnitZ, (float)runTime * (MathF.PI / 180f) * 5),
-            View = Matrix4x4.CreateLookAt(new Vector3(2f), Vector3.Zero, Vector3.UnitZ),
-            Perspective = Matrix4x4.CreatePerspectiveFieldOfView(45 * (MathF.PI / 180f), _window.FramebufferSize.X / (float)_window.FramebufferSize.Y, 0.1f, 10.0f)
-        };
-        _vulkanServices.ViewMatrices = ubo;
+        //UniformBufferObject ubo = new UniformBufferObject
+        //{
+        //    Model = Matrix4x4.CreateFromAxisAngle(Vector3.UnitZ, (float)runTime * (MathF.PI / 180f) * 5),
+        //    View = Matrix4x4.CreateLookAt(new Vector3(2f), Vector3.Zero, Vector3.UnitZ),
+        //    Perspective = Matrix4x4.CreatePerspectiveFieldOfView(45 * (MathF.PI / 180f), _window.FramebufferSize.X / (float)_window.FramebufferSize.Y, 0.1f, 10.0f)
+        //};
+        //_vulkanServices.ViewMatrices = ubo;
 
 
     }
 
     private void WindowOnRender(double obj)
     {
-        _vulkanServices.Render();
+        //_vulkanServices.Render();
     }
 
     private void WindowOnClosing()
@@ -81,7 +83,7 @@ internal class Game
     private void WindowOnFramebufferResize(Vector2D<int> obj)
     {
         //_vulkanServices.WaitForIdle();
-        _vulkanServices.FramebufferResized = true;
+        //_vulkanServices.FramebufferResized = true;
 
 
     }
@@ -96,14 +98,54 @@ internal class Game
             consoleDebugUtils.SetupMessenger();
         }
 
-        var surfaceKhronos = _instance.CreateSurface(_window);
-        var physicalDevices = _instance.GetPhysicalDevices()
-                .PopulateQueueFamilies()
-            
-            .Where(d => d.CanPresent && d.CanRender)
-            .PopulateSwapChainSupport(surfaceKhronos)
-            .Where(d => )
-            ;
+        if (!_instance.TryGetExtension<SporkKhronosSurfaceExtension, KhrSurface>(out var khronosSurfaceExtension))
+        {
+            throw new NotSupportedException("Unable to find the KHR_surface Extension");
+        }
 
+        var requiredExtensions = new[]
+        {
+            KhrSwapchain.ExtensionName
+        };
+
+        var surfaceKhronos = _instance.CreateSurface(_window);
+        var validPhysicalDevices = GetValidPhysicalDevices(khronosSurfaceExtension, surfaceKhronos, requiredExtensions);
+
+        var physicalDevice = validPhysicalDevices.FirstOrDefault() ?? throw new Exception("Unable to find a valid device that can be used to render graphics and present");
+        Queue graphicsQueue = default;
+        Queue presentQueue = default;
+        var device = physicalDevice.PhysicalDevice.DefineLogicalDevice()
+            .WithQueue(physicalDevice.GraphicsIndex.Index, createdQueue => graphicsQueue = createdQueue)
+            .WithQueue(physicalDevice.PresentIndex.Index, createdQueue => presentQueue = createdQueue)
+            .WithValidationLayers(_spork.ActiveValidationLayers)
+            .WithDeviceExtensions(requiredExtensions)
+            .Create();
+        _applicationScopeDisposables.Add(device);
     }
+
+    private IEnumerable<SelectedPhysicalDevice> GetValidPhysicalDevices(SporkKhronosSurfaceExtension khronosSurfaceExtension, SurfaceKHR surfaceKhronos, string[] requiredExtensions)
+    {
+        return from physicalDevice in _instance.GetPhysicalDevices(requiredExtensions)
+            let queueFamilies = physicalDevice.GetPhysicalDeviceQueueFamilyProperties()
+            let graphicsQueueFamily = queueFamilies.FirstOrDefault(p => p.Properties.QueueFlags.HasFlag(QueueFlags.QueueGraphicsBit))
+            let presentQueueFamily = queueFamilies.FirstOrDefault(queueFamilyProperties => khronosSurfaceExtension.DoesQueueSupportPresentation(physicalDevice, queueFamilyProperties.Index, surfaceKhronos))
+            where presentQueueFamily != null && graphicsQueueFamily != null
+            let surfaceCapabilities = khronosSurfaceExtension.GetPhysicalDeviceSurfaceCapabilities(physicalDevice, surfaceKhronos)
+            let surfaceFormats = khronosSurfaceExtension.GetPhysicalDeviceSurfaceFormats(physicalDevice, surfaceKhronos)
+            let surfacePresentModes = khronosSurfaceExtension.GetPhysicalDeviceSurfacePresentModes(physicalDevice, surfaceKhronos)
+            where surfaceFormats.Any() && surfacePresentModes.Any()
+            select new SelectedPhysicalDevice(physicalDevice, graphicsQueueFamily, presentQueueFamily);
+    }
+}
+
+public record SelectedPhysicalDevice(
+    SporkPhysicalDevice PhysicalDevice, 
+    PhysicalDeviceQueueFamilyProperties GraphicsIndex, 
+    PhysicalDeviceQueueFamilyProperties PresentIndex)
+{
+    
+
+    public uint[] UniqueQueueIndices => GraphicsIndex.Index == PresentIndex.Index 
+        ? new[] { GraphicsIndex.Index }
+        : new[] { GraphicsIndex.Index, PresentIndex.Index };
 }

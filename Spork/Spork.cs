@@ -8,12 +8,6 @@ using Silk.NET.Windowing;
 
 namespace Spork;
 
-
-public interface IInternalSpork
-{
-    Vk Vulkan { get; }
-}
-
 public class Spork : IInternalSpork
 {
     private readonly IWindow _window;
@@ -54,22 +48,15 @@ public class Spork : IInternalSpork
         "VK_NV_external_memory_capabilities"
     };
 
-    private IReadOnlyList<string> MandatoryDeviceExtensions { get; init; } = new List<string>
-    {
-        KhrSwapchain.ExtensionName
-    };
-
-    private IReadOnlyList<string> DesiredDeviceExtensions { get; init; } = new List<string>();
-
-    private string[]? _validationLayers;
+    public string[]? ActiveValidationLayers { get; private set; }
 
     public unsafe SporkInstance CreateInstance()
     {
         Console.WriteLine("Initializing Vulkan");
         if (EnableValidationLayers)
         {
-            _validationLayers = GetOptimalValidationLayers();
-            if (_validationLayers is null)
+            ActiveValidationLayers = GetOptimalValidationLayers();
+            if (ActiveValidationLayers is null)
             {
                 throw new NotSupportedException("Validation Layers requested, but not available, You may need to install the Vulkan SDK");
             }
@@ -100,10 +87,10 @@ public class Spork : IInternalSpork
         createInfo.EnabledExtensionCount = extensionCount;
         createInfo.PpEnabledExtensionNames = newExtensions;
 
-        if (EnableValidationLayers && _validationLayers is not null)
+        if (EnableValidationLayers && ActiveValidationLayers is not null)
         {
-            createInfo.EnabledLayerCount = (uint)_validationLayers.Length;
-            createInfo.PpEnabledLayerNames = (byte**)SilkMarshal.StringArrayToPtr(_validationLayers);
+            createInfo.EnabledLayerCount = (uint)ActiveValidationLayers.Length;
+            createInfo.PpEnabledLayerNames = (byte**)SilkMarshal.StringArrayToPtr(ActiveValidationLayers);
         }
 
         if (_vk.CreateInstance(&createInfo, null, out var instance) != Result.Success)
@@ -112,12 +99,7 @@ public class Spork : IInternalSpork
         }
 
         _vk.CurrentInstance = instance;
-
-        //if (!_vk.TryGetInstanceExtension(instance, out _vkSurface))
-        //{
-        //    throw new NotSupportedException("KHR_surface extension not found");
-        //}
-
+        
         Marshal.FreeHGlobal((nint)appInfo.PApplicationName);
         Marshal.FreeHGlobal((nint)appInfo.PEngineName);
 
@@ -126,11 +108,7 @@ public class Spork : IInternalSpork
             SilkMarshal.Free((nint)createInfo.PpEnabledLayerNames);
         }
 
-        return new SporkInstance(this, instance)
-        {
-            MandatoryDeviceExtensions = MandatoryDeviceExtensions,
-            DesiredDeviceExtensions = DesiredDeviceExtensions
-        };
+        return new SporkInstance(this, instance);
     }
 
     private unsafe string[]? GetOptimalValidationLayers()
