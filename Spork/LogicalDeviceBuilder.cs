@@ -1,13 +1,14 @@
 ﻿using System.Runtime.CompilerServices;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
+using Spork.LowLevel;
 
 namespace Spork;
 
 public class LogicalDeviceBuilder : ILogicalDeviceBuilder
 {
     private readonly Vk _vk;
-    private readonly PhysicalDevice _physicalDevice;
+    private readonly ISporkPhysicalDevice _physicalDevice;
     private readonly List<(uint physicalDeviceGraphicsIndex, Action<Queue> createdQueue)> _queuesDefined = new();
     private readonly List<DeviceQueueCreateInfo> _deviceCreateInfos = new();
     private readonly DisposableSet _disposableMemory = new ();
@@ -17,7 +18,7 @@ public class LogicalDeviceBuilder : ILogicalDeviceBuilder
 
     
 
-    public LogicalDeviceBuilder(Vk vk, PhysicalDevice physicalDevice)
+    public LogicalDeviceBuilder(Vk vk, ISporkPhysicalDevice physicalDevice)
     {
         _vk = vk;
         _physicalDevice = physicalDevice;
@@ -88,7 +89,7 @@ public class LogicalDeviceBuilder : ILogicalDeviceBuilder
             deviceCreateInfo.EnabledLayerCount = 0;
         }
         
-        if (_vk.CreateDevice(_physicalDevice, &deviceCreateInfo, null, out var device) != Result.Success)
+        if (_vk.CreateDevice(_physicalDevice.VulkanPhysicalDevice, &deviceCreateInfo, null, out var device) != Result.Success)
         {
             throw new Exception("Failed to create logical device");
         }

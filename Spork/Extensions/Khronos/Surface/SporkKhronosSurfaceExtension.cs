@@ -1,7 +1,9 @@
 ﻿using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.KHR;
 using Silk.NET.Windowing;
-using Spork;
+using Spork.LowLevel;
+
+namespace Spork.Extensions.Khronos.Surface;
 
 public class SporkKhronosSurfaceExtension : ISporkInstanceExtension<KhrSurface>
 {
@@ -13,7 +15,7 @@ public class SporkKhronosSurfaceExtension : ISporkInstanceExtension<KhrSurface>
         init => _nativeExtension = value;
     }
 
-    IInternalSporkInstance ISporkInstanceExtension<KhrSurface>.Instance
+    ISporkInstance ISporkInstanceExtension<KhrSurface>.Instance
     {
         init => _instance = value.NativeInstance;
     }

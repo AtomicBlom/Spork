@@ -1,8 +1,8 @@
 ﻿using Silk.NET.Vulkan;
 
-namespace Spork;
+namespace Spork.LowLevel;
 
-public interface IInternalSporkInstance
+public interface ISporkInstance
 {
     Vk Vulkan { get; }
     Instance NativeInstance { get; }

@@ -1,8 +1,8 @@
 ﻿using Silk.NET.Vulkan;
 
-namespace Spork;
+namespace Spork.LowLevel;
 
-public interface IInternalSpork
+public interface ISpork
 {
     Vk Vulkan { get; }
 }

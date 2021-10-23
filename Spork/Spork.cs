@@ -5,15 +5,16 @@ using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.EXT;
 using Silk.NET.Vulkan.Extensions.KHR;
 using Silk.NET.Windowing;
+using Spork.LowLevel;
 
 namespace Spork;
 
-public class Spork : IInternalSpork
+public class Spork : ISpork
 {
     private readonly IWindow _window;
     private readonly Vk _vk;
 
-    Vk IInternalSpork.Vulkan => _vk;
+    Vk ISpork.Vulkan => _vk;
 
     public Spork(IWindow window)
     {

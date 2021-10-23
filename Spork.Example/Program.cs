@@ -5,6 +5,9 @@ using Silk.NET.Vulkan.Extensions.EXT;
 using Silk.NET.Vulkan.Extensions.KHR;
 using Silk.NET.Windowing;
 using Spork;
+using Spork.Extensions;
+using Spork.Extensions.Khronos.Surface;
+using Spork.Extensions.Khronos.Swapchain;
 
 try
 {
@@ -54,6 +57,8 @@ internal class Game
     private double runTime = 0;
     private SporkInstance _instance;
     private DisposableSet _applicationScopeDisposables;
+    private SwapchainDefinition _swapchainDefinition;
+    private SelectedPhysicalDevice _physicalDevice;
 
     private void WindowOnUpdate(double time)
     {
@@ -90,8 +95,17 @@ internal class Game
 
     public void InitializeVulkan()
     {
+        Queue graphicsQueue = default;
+        Queue presentQueue = default;
+
         _applicationScopeDisposables = new DisposableSet();
         _instance = _applicationScopeDisposables.Add(_spork.CreateInstance());
+        Console.WriteLine("Available Instance extensions");
+        foreach (var extensionProperties in _instance.GetExtensions())
+        {
+            Console.WriteLine($"{extensionProperties.Name,-40} (v{extensionProperties.SpecVersion})");
+        }
+
         if (_spork.EnableValidationLayers && _instance.TryGetExtension<ConsoleDebugExtension, ExtDebugUtils>(out var consoleDebugUtils))
         {
             _applicationScopeDisposables.Add(consoleDebugUtils);
@@ -110,18 +124,68 @@ internal class Game
 
         var surface = _applicationScopeDisposables.Add(khronosSurfaceExtension.CreateSurface(_window));
         
-        var validPhysicalDevices = GetValidPhysicalDevices(surface, requiredExtensions);
-
-        var physicalDevice = validPhysicalDevices.FirstOrDefault() ?? throw new Exception("Unable to find a valid device that can be used to render graphics and present");
-        Queue graphicsQueue = default;
-        Queue presentQueue = default;
-        var device = physicalDevice.PhysicalDevice.DefineLogicalDevice()
-            .WithQueue(physicalDevice.GraphicsIndex.Index, createdQueue => graphicsQueue = createdQueue)
-            .WithQueue(physicalDevice.PresentIndex.Index, createdQueue => presentQueue = createdQueue)
+        _physicalDevice = GetValidPhysicalDevices(surface, requiredExtensions)
+            .FirstOrDefault() ?? throw new Exception("Unable to find a valid device that can be used to render graphics and present");
+        
+        var device = _physicalDevice.PhysicalDevice.DefineLogicalDevice()
+            .WithQueue(_physicalDevice.GraphicsIndex.Index, createdQueue => graphicsQueue = createdQueue)
+            .WithQueue(_physicalDevice.PresentIndex.Index, createdQueue => presentQueue = createdQueue)
             .WithValidationLayers(_spork.ActiveValidationLayers)
             .WithDeviceExtensions(requiredExtensions)
             .Create();
         _applicationScopeDisposables.Add(device);
+
+        var definition = DefineSwapChain(device, surface);
+
+        if (!TryCreateSwapChain(definition, out var swapchain))
+        {
+            throw new Exception("Failed to create the first swapchain");
+        }
+
+        var colourAttachment = new SporkColorAttachment()
+        {
+            Format = swapchain.ImageFormat,
+
+        };
+        var subpass = new SporkSubpass(PipelineBindPoint.Graphics)
+            .WithColorAttachment(colourAttachment)
+            .AfterExternal();
+
+        var renderPassDefinition = device.DefineRenderPass()
+            .WithSubpass(subpass);
+
+    }
+
+    private ISwapchainDefinition DefineSwapChain(SporkLogicalDevice device, SporkSurface sporkSurface)
+    {
+        if (!device.TryGetExtension<SporkKhronosSwapchainExtension, KhrSwapchain>(out var khronosSwapchainExtension))
+        {
+            throw new NotSupportedException("Unable to find the KHR_swapchain Extension");
+        }
+
+        var surfaceFormat = _physicalDevice.SurfaceFormats.FirstOrDefault(format => format.Format == Format.B8G8R8A8Unorm && format.ColorSpace == ColorSpaceKHR.ColorSpaceSrgbNonlinearKhr, _physicalDevice.SurfaceFormats[0]);
+        var presentMode = _physicalDevice.SurfacePresentModes.FirstOrDefault(mode => mode == PresentModeKHR.PresentModeMailboxKhr, PresentModeKHR.PresentModeFifoKhr);
+
+        return khronosSwapchainExtension.DefineSwapchain(sporkSurface)
+            .WithQueueFamily(_physicalDevice.GraphicsIndex.Index)
+            .WithQueueFamily(_physicalDevice.PresentIndex.Index)
+            .WithSurfaceFormat(surfaceFormat)
+            .WithPresentMode(presentMode);
+    }
+
+    private bool TryCreateSwapChain(ISwapchainDefinition definition, out SporkSwapchain swapchain)
+    {
+        definition.WithImageExtent(_window.FramebufferSize);
+        if (!definition.CanCreate)
+        {
+            swapchain = null!;
+            return false;
+        }
+
+        var swapchainDisposableSet = _applicationScopeDisposables.Add(new DisposableSet());
+        swapchain = _swapchainDefinition.Create(swapchainDisposableSet);
+        
+        return true;
     }
 
     private IEnumerable<SelectedPhysicalDevice> GetValidPhysicalDevices(SporkSurface surface, string[] requiredExtensions)
@@ -131,22 +195,15 @@ internal class Game
             let graphicsQueueFamily = queueFamilies.FirstOrDefault(p => p.Properties.QueueFlags.HasFlag(QueueFlags.QueueGraphicsBit))
             let presentQueueFamily = queueFamilies.FirstOrDefault(queueFamilyProperties => surface.DoesQueueSupportPresentation(physicalDevice, queueFamilyProperties.Index))
             where presentQueueFamily != null && graphicsQueueFamily != null
-            let surfaceCapabilities = surface.GetPhysicalDeviceSurfaceCapabilities(physicalDevice)
             let surfaceFormats = surface.GetPhysicalDeviceSurfaceFormats(physicalDevice)
             let surfacePresentModes = surface.GetPhysicalDeviceSurfacePresentModes(physicalDevice)
             where surfaceFormats.Any() && surfacePresentModes.Any()
-            select new SelectedPhysicalDevice(physicalDevice, graphicsQueueFamily, presentQueueFamily);
+            select new SelectedPhysicalDevice(physicalDevice, graphicsQueueFamily, presentQueueFamily, surfaceFormats, surfacePresentModes);
     }
 }
 
-public record SelectedPhysicalDevice(
-    SporkPhysicalDevice PhysicalDevice, 
-    PhysicalDeviceQueueFamilyProperties GraphicsIndex, 
-    PhysicalDeviceQueueFamilyProperties PresentIndex)
-{
-    
-
-    public uint[] UniqueQueueIndices => GraphicsIndex.Index == PresentIndex.Index 
-        ? new[] { GraphicsIndex.Index }
-        : new[] { GraphicsIndex.Index, PresentIndex.Index };
-}
+public record SelectedPhysicalDevice(SporkPhysicalDevice PhysicalDevice,
+    PhysicalDeviceQueueFamilyProperties GraphicsIndex,
+    PhysicalDeviceQueueFamilyProperties PresentIndex,
+    SurfaceFormatKHR[] SurfaceFormats,
+    PresentModeKHR[] SurfacePresentModes);

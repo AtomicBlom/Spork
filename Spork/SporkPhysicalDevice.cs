@@ -1,19 +1,24 @@
 ﻿using System.Runtime.CompilerServices;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
+using Spork.LowLevel;
 
 namespace Spork;
 
 public class SporkPhysicalDevice : ISporkPhysicalDevice
 {
     private readonly Vk _vk;
+    private readonly ISporkInstance _instance;
     private readonly PhysicalDevice _physicalDevice;
 
     PhysicalDevice ISporkPhysicalDevice.VulkanPhysicalDevice => _physicalDevice;
 
-    public SporkPhysicalDevice(Vk vk, PhysicalDevice physicalDevice)
+    ISporkInstance ISporkPhysicalDevice.Instance => _instance;
+
+    public SporkPhysicalDevice(Vk vk, ISporkInstance instance, PhysicalDevice physicalDevice)
     {
         _vk = vk;
+        _instance = instance;
         _physicalDevice = physicalDevice;
     }
 
@@ -43,6 +48,6 @@ public class SporkPhysicalDevice : ISporkPhysicalDevice
 
     public ILogicalDeviceBuilder DefineLogicalDevice()
     {
-        return new LogicalDeviceBuilder(_vk, _physicalDevice);
+        return new LogicalDeviceBuilder(_vk, this);
     }
 }

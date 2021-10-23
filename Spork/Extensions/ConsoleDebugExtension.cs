@@ -1,8 +1,9 @@
 ﻿using System.Runtime.InteropServices;
 using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.EXT;
+using Spork.LowLevel;
 
-namespace Spork;
+namespace Spork.Extensions;
 
 public sealed class ConsoleDebugExtension : ISporkInstanceExtension<ExtDebugUtils>, IDisposable
 {
@@ -15,7 +16,7 @@ public sealed class ConsoleDebugExtension : ISporkInstanceExtension<ExtDebugUtil
     {
         init => _nativeExtension = value;
     }
-    IInternalSporkInstance ISporkInstanceExtension<ExtDebugUtils>.Instance
+    ISporkInstance ISporkInstanceExtension<ExtDebugUtils>.Instance
     {
         init => _instance = value.NativeInstance;
     }

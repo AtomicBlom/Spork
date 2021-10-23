@@ -3,12 +3,19 @@ using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.KHR;
 using Spork;
+using Spork.LowLevel;
 
-public class SporkSurface : IDisposable
+namespace Spork.Extensions.Khronos.Surface;
+
+public class SporkSurface : ISporkSurface, IDisposable
 {
     private readonly Instance _instance;
     private readonly KhrSurface _nativeExtension;
     private readonly SurfaceKHR _surface;
+
+    SurfaceKHR ISporkSurface.NativeSurface => _surface;
+
+    KhrSurface ISporkSurface.NativeExtension => _nativeExtension;
 
     public SporkSurface(Instance instance, KhrSurface nativeExtension, SurfaceKHR surface)
     {
@@ -82,4 +89,14 @@ public class SporkSurface : IDisposable
     {
         ReleaseUnmanagedResources();
     }
+}
+
+public interface ISporkSurface
+{
+    SurfaceKHR NativeSurface { get; }
+    KhrSurface NativeExtension { get; }
+    bool DoesQueueSupportPresentation(ISporkPhysicalDevice physicalDevice, uint index);
+    SurfaceCapabilitiesKHR GetPhysicalDeviceSurfaceCapabilities(ISporkPhysicalDevice physicalDevice);
+    SurfaceFormatKHR[] GetPhysicalDeviceSurfaceFormats(ISporkPhysicalDevice physicalDevice);
+    PresentModeKHR[] GetPhysicalDeviceSurfacePresentModes(ISporkPhysicalDevice physicalDevice);
 }
